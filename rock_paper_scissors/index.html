@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="rock_paper_scissors.js"></script>
+</head>
+<body>
+  <h1>Rock! Paper! Scissors!</h1>
+  <div class="scores-container">
+    <h3>Your score: <span class="player-score">0</span></h3>
+    <h3>Computer's score: <span class="computer-score">0</span></h3>
+  </div>
+
+  <div class="playing-area">
+    <img class="hand" id="player-hand" src="./icons/rock.png" alt="">
+    <img class="hand" id="computer-hand" src="./icons/rock.png" alt="">
+  </div>
+
+  <div class="move-container">
+    <button class="move-btn" id="rock-btn">
+      <img src="./icons/rock.png" alt="">
+    </button>
+    <button class="move-btn" id="paper-btn">
+      <img src="./icons/paper.png" alt="">
+    </button>
+    <button class="move-btn" id="scissors-btn">
+      <img src="./icons/scissors.png" alt="">
+    </button>
+  </div>
+
+  <div class="endgame-screen">
+    <h1>Some Text</h1>
+    <h2><span class="player-score"></span> - <span class="computer-score"></span></h2>
+    <button id="play-again-btn">Play Again?</button>
+  </div>
+</body>
+</html>
