@@ -1,0 +1,97 @@
+html{
+  --extra-round-radius: 20px;
+  --round-radius: 10px
+}
+*{
+  box-sizing: border-box;
+}
+
+body{
+  margin: 0;
+  background: #0b0b0b;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+}
+
+.calculator-container{
+  display: grid;
+  grid-template:
+  [row1-start] "display display" 25% [row1-start]
+  [row2-start] "numpad operationpad"75% [row-2-end]
+  / 1fr 0.65fr;
+  width: 50%;
+  min-width: 318px;
+  max-width: 605px;
+  margin: auto;
+  height: 50vh;
+  gap: 20px;
+}
+
+.calculator-display{
+  grid-area: display;
+  color: white;
+  min-height: 1em;
+  font-size: 20pt;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 600;
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  background-color: rgb(36, 36, 46);
+  border-radius: var(--extra-round-radius);
+}
+
+.num-pad{
+  display: grid;
+  grid-area: numpad;
+  grid-template: repeat(4,1fr) / repeat(3,1fr);
+}
+
+.operation-pad{
+  grid-area: operationpad;
+  display: grid;
+  grid-template:
+    repeat(4, 1fr)
+    / repeat(2, 1fr);
+}
+
+.num-pad, .operation-pad{
+  gap: 5px;
+}
+
+.num-pad button,.operation-pad button{
+  border-radius: 10px;
+  font-family: Roboto, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-size: 20pt;
+  cursor: pointer;
+  border: none;
+}
+
+button.top-right{
+  border-top-right-radius: var(--extra-round-radius);
+}
+button.bottom-right{
+  border-bottom-right-radius: var(--extra-round-radius);
+}
+button.top-left{
+  border-top-left-radius: var(--extra-round-radius);
+}
+button.bottom-left{
+  border-bottom-left-radius: var(--extra-round-radius);
+}
+
+.operation-pad button.deletion-btn{
+  background-color: #c06000;
+  color: white;
+  font-weight: bold;
+}
+
+#key-eq{
+  grid-column-start: 1;
+  grid-column-end: 3;
+}
+
+#key-decimal-point{
+  font-size: 3em;
+}
