@@ -1,14 +1,30 @@
 const calculatorDisplayDiv = document.querySelector(".calculator-display");
-var calculatorDisplay = "";
+
+const calculatorInputDiv = document.querySelector(".calculator-input");
+const calculatorOutputDiv = document.querySelector(".calculator-output");
 var previousResult;
+/**
+ * @type {'writing' | 'evaluated' | 'error'}
+ */
+var calculatorState = 'writing';
+
+const calculatorHistory = [];
 
 // ---- Utility functions ----
+/**
+ * @param {Array} arr 
+ * @returns member at end of array 
+ */
 function arrayBack(arr){
   if(arr.length > 0){
     return arr[arr.length - 1];
   }
   return undefined;
 }
+/**
+ * @param {Array} arr 
+ * @returns first member of the array
+ */
 function arrayFront(arr){
   return arr[0];
 }
@@ -22,24 +38,45 @@ function count(toBeFound, arr){
   }
   return arr.reduce((count, value) => value === toBeFound ? count+1 : count);
 }
+/**
+ * @param {Array} array 
+ * @param {(element, index:number, array:Array) => boolean} callBackFn 
+ */
+function findLastIndex(array, callBackFn){
+  let i;
+  for(i = array.length - 1; i >= 0; i++){
+    const currentElement =  array[i];
+    if(callBackFn(currentElement, i, array)){
+      break;
+    }
+  }
+  return i;
+}
 
 // ---- Dictionaries ----
 const operationInfo = {
   '-':{
-    display: '−',
+    text: '−',
     basicFunction: (a,b) => a + b,
+    priority: 1,
   },
   '/': {
-    display: '÷',
-    basicFunction: (a,b) => a / b,
+    text: '÷',
+    basicFunction: (a,b) => {
+      if(b === 0) return makeError('Math Error', 'Division by zero not allowed');
+      return a / b;
+    },
+    priority: 1,
   },
   '*': {
-    display: '×',
+    text: '×',
     basicFunction: (a,b) => a * b,
+    priority: 0,
   },
   '+': {
-    display: '+',
+    text: '+',
     basicFunction: (a,b) => a + b,
+    priority: 0,
   }
 }
 
@@ -51,7 +88,7 @@ function makeNumberToken(n){
     type: 'value',
     valueType: 'number',
     text: String(n),
-    getValue: () => {
+    getValue: function() {
       return Number.parseFloat(this.text);
     }
   }
@@ -60,29 +97,29 @@ function makeNumberToken(n){
 function makeOperationToken(operation){
   return{
     type: 'operation',
-    text: operation,
-    displayCharacter: operationInfo[operation].display,
-    basicFunction: operationInfo[operation].basicFunction
+    ... operationInfo[operation]
   }
 }
 
 function pushNumberToExpression(n){
   calculatorExpression.push(makeNumberToken(n));
-  console.log(`added ${n} to calculatorExpression -> `, calculatorExpression);
 }
 
-function pushAnsToExpression(n){
-  return {
+function pushAnsToExpression(){
+  calculatorExpression.push({
     type: 'value',
     valueType: 'variable',
-    text: String(n),
+    text: 'Ans',
     getValue: () => {
       return previousResult;
     }
-  }
+  })
 }
 
 function pushOperationToExpression(operation){
+  if(calculatorExpression.length === 0){
+    pushNumberToExpression('0');
+  }
   calculatorExpression.push(makeOperationToken(operation));
 }
 
@@ -96,55 +133,88 @@ function pushDigitToExpression(digit){
   expressionEnd.text += digit;
 }
 
-const validateNumber = (numToken) => {
+const numberTokenIsValid = (numToken) => {
   return count('.', numToken.text) <= 1;
+}
+
+function validateLastToken(lastToken, prev){
+
 }
 
 function validateExpression(){
   var nextType = "value";
-  for(const current of calculatorExpression){
-    if(current.type !== nextType){
-      current.syntaxError = `Expecteda a(n) ${nextType}`;
+  for(const currentToken of calculatorExpression){
+    if(currentToken.type !== nextType){
+      currentToken.syntaxError = `Expected a(n) ${nextType}`;
       return;
+    }
+    if(currentToken.valueType === "number"){
+      if(numberTokenIsValid(currentToken))
+        (currentToken.syntaxError = "Numbers can't have more than one decimal point");
     }
     nextType = nextType === "value" ? "operation" : "value";
   }
 }
 
-pushDigitToExpression('2');
-pushDigitToExpression('4')
-pushOperationToExpression('+');
-pushDigitToExpression('3');
-pushOperationToExpression('-');
-pushOperationToExpression('+');
-
-validateExpression();
-
 function updateCalculatorDisplay(){
-  calculatorDisplayDiv.textContent = calculatorDisplay;
+  calculatorDisplayDiv.textContent = calculatorExpression.map(token => token.text).join(' ');
 }
 
-function clearDisplay(){
-  calculatorDisplay = "";
-  updateCalculatorDisplay();
+function tokenToHTMLSpan(token){
+  const spanElement = document.createElement('span');
+  spanElement.classList.add("token", token.type);
+  spanElement.textContent = token.text;
+  return spanElement;
+}
+
+function numberDelete(numberToken){
+  if(numberToken.text.length <= 1){
+    calculatorExpression.pop();
+    return;
+  }
+  numberToken.text = numberToken.text.slice(0, -1);
 }
 
 function inputDel(){
-  calculatorDisplay = calculatorDisplay.slice(0, -1);
+  const expressionEnd = arrayBack(calculatorExpression);
+  if(expressionEnd === undefined) return;
+  if(expressionEnd.type === 'value' || expressionEnd.valueType === 'number'){
+    numberDelete(expressionEnd);
+  } else {
+    calculatorExpression.pop();
+  }
   updateCalculatorDisplay();
 }
 
-function inputFn(input){
+function clearDisplay(){
+  calculatorExpression.length = 0;
+  updateCalculatorDisplay();
+}
+
+function digitInputFn(input){
   return () => {
-    calculatorDisplay += input;
+    pushDigitToExpression(input);
+    updateCalculatorDisplay();
+  }
+}
+function operationInputFn(operation){
+  return () => {
+    pushOperationToExpression(operation);
+    updateCalculatorDisplay();
+  }
+}
+function ansInputFn(){
+  return () => {
+    pushAnsToExpression();
     updateCalculatorDisplay();
   }
 }
 
 function keyToButton(buttonParent){
   return (key) => {
+    //auto-fill missing data
     if(key.callBackFn === undefined){
-      key.callBackFn = inputFn(key.text);
+      key.callBackFn = digitInputFn(key.text);
     }
     if(key.keydownChecks === undefined){
       key.keydownChecks = new Set([key.text]);
@@ -153,22 +223,21 @@ function keyToButton(buttonParent){
       key.idText = key.text.toLowerCase();
     }
 
+    //create button
     const btn = document.createElement('button');
     btn.id = 'key-'+key.idText;
     btn.textContent = key.text;
     buttonParent.appendChild(btn);
-  
-    btn.addEventListener('click', key.callBackFn);
     if(key.additionalClasses) btn.classList.add(...key.additionalClasses);
-
+  
+    //Add event listeners
+    btn.addEventListener('click', key.callBackFn);
     window.addEventListener('keydown', (event) => {
-      // console.log(key.keydownChecks)
       if(key.keydownChecks.has(event.key.toLowerCase())){
-        // console.log(event.key)
         key.callBackFn();
       } 
     });
-    
+
     return btn;
   }
 }
@@ -220,28 +289,124 @@ const operationPadKeys = [{
 },{
   text: '+',
   idText: 'add',
-  callBackFn: inputFn(' + '),
+  callBackFn: operationInputFn('+'),
 },{
   text: '−',
   idText: 'sub',
-  callBackFn: inputFn(' - ')
+  callBackFn: operationInputFn('-'),
+  keydownChecks: new Set('-')
 },{
   text: '÷',
   idText: 'div',
-  callBackFn: inputFn(' ÷ ')
+  callBackFn: operationInputFn('/'),
+  keydownChecks: new Set('/')
 },{
   text: '×',
   idText: 'mult',
-  callBackFn: inputFn(' × ')
+  callBackFn: operationInputFn('*'),
+  keydownChecks: new Set('*')
 },{
   text: '=',
   idText: 'eq',
-  callBackFn: operate,
+  callBackFn: displayExpressionEvaluation,
   keydownChecks: new Set(['enter', '=']),
   additionalClasses: ['bottom-right']
 }]
 const operationPadButtons = operationPadKeys.map(keyToButton(operationPad));
 
-function operate(operation, a, b){
+/**
+ * @param {"Math Error" | "Syntax Error"} type 
+ * @param {string} message 
+ * @returns returns an error object 
+ */
+function makeError(type, message){
+  return{
+    type: type,
+    message: message,
+    toString: function(){
+      return `${this.type}: ${this.message}`;
+    }
+  }
+}
 
+/**
+ * @param {undefined | Array} tokenizedExpression 
+ * @returns operation to be executed last
+ */
+function getLastOperationIndex(tokenizedExpression){
+  let i, lastOperationIndex;
+  for(i = tokenizedExpression.length - 1; i >= 0; i--){
+    const currentToken = tokenizedExpression[i];
+    // console.log('i: '+i);
+    if(currentToken.type !== 'operation'){
+      continue;
+    }
+    if(lastOperationIndex === undefined){
+      lastOperationIndex = i;
+    } else if(currentToken.priority === 0) {
+      return i;
+    } else {
+      const lastOperation = tokenizedExpression[lastOperationIndex];
+      if(currentToken.priority < lastOperation.priority){
+        lastOperationIndex = i;
+      }
+    }
+  }
+
+  return lastOperationIndex;
+}
+
+
+/**
+ * @param {undefined | Array} tokenizedExpression 
+ * @returns number (evaluaiton of expression) or CustomError
+ */
+function getExpressionEvaluation(tokenizedExpression){
+  // If no argument is passed
+  if(!tokenizedExpression){
+    tokenizedExpression = calculatorExpression;
+    for(token of tokenizedExpression){
+      if(token.syntaxError){
+        return makeError('Syntax Error', token.syntaxError);
+      }
+    }
+  }
+
+  if(tokenizedExpression.length === 1){
+    return arrayFront(tokenizedExpression).getValue();
+  }
+
+  const lastOperationIndex = getLastOperationIndex(tokenizedExpression);
+  if(lastOperationIndex !== undefined){
+    const lastOperation = tokenizedExpression[lastOperationIndex];
+    return operate(
+      lastOperation, 
+      //tokens to the opeartion's left
+      tokenizedExpression.slice(0, lastOperationIndex), 
+      //tokens to the operation's right
+      tokenizedExpression.slice(lastOperationIndex + 1, tokenizedExpression.length)
+    )
+  }
+}
+
+function displayExpressionEvaluation(){
+  console.log(getExpressionEvaluation());
+  calculatorDisplayDiv.textContent = getExpressionEvaluation();
+}
+
+function operate(operation, a, b){
+  const evaluationA = getExpressionEvaluation(a);
+  const evaluationB = getExpressionEvaluation(b);
+
+  if(evaluationA.message !== undefined){
+    return evaluationA;
+  }
+  if(evaluationB.message !== undefined){
+    return evaluationB;
+  }
+
+  return operation.basicFunction(
+    evaluationA,
+    evaluationB
+  )
 }
