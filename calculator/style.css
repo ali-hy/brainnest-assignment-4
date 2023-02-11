@@ -46,7 +46,7 @@ body{
 
 .calculator-input{
   position:relative;
-  color: #ffffffaa
+  color: #ffffffaa;
 }
 
 .calculator-input.active::after{
