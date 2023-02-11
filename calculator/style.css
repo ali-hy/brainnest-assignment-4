@@ -44,6 +44,11 @@ body{
   border-radius: var(--extra-round-radius);
 }
 
+.calculator-input{
+  position:relative;
+  color: #ffffffaa
+}
+
 .calculator-input.active::after{
   content: '_';
   display: inline;
@@ -106,6 +111,32 @@ button.bottom-left{
   background-color: #c06000;
   color: white;
   font-weight: bold;
+}
+
+.token{
+  margin-right: 5px;
+}
+
+.token.error{
+  text-decoration: underline;
+  text-decoration-color: red;
+}
+
+.token.error::after{
+  content: attr(data-error-message);
+  display: block;
+  background: #333;
+  font-size: 12pt;
+  top: 0;
+  transform: translateY(-100%);
+  padding: 2px 10px;
+  position: absolute;
+  opacity: 0;
+  transition-delay: 0.3s;
+}
+
+.token.error:hover::after{
+  opacity: 1;
 }
 
 #key-eq{

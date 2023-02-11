@@ -1,9 +1,51 @@
 const calculatorDisplayDiv = document.querySelector(".calculator-display");
 
-const calculatorInputDiv = document.querySelector(".calculator-input");
 const calculatorOutputDiv = document.querySelector(".calculator-output");
 
 const calculatorExpression = [];
+
+const calculatorInputDiv = document.querySelector(".calculator-input");
+function pushTokenToInputDiv(){
+  calculatorInputDiv.appendChild(
+    tokenToHTMLSpan(arrayBack(calculatorExpression))
+  );
+}
+function updateLastTokenInInputDiv(){
+  calculatorInputDiv.replaceChild(
+    tokenToHTMLSpan(arrayBack(calculatorExpression)),
+    calculatorInputDiv.lastElementChild
+  );
+}
+function popTokenFromInputDiv(){
+  calculatorInputDiv.removeChild(calculatorInputDiv.lastChild);
+}
+
+function updateInputDiv({updateType}){
+  switch(updateType){
+    case 'update':
+      updateLastTokenInInputDiv();
+      break;
+    case 'push':
+      pushTokenToInputDiv();
+      break;
+    case 'pop':
+      popTokenFromInputDiv();
+      break;
+    case 'none':
+      console.log("no update occured");
+      break;
+    default:
+      throw new Error("update type for updateInputDiv(updateType) can only be "
+      + "'update', 'push', 'pop', or 'none'\n"
+      + updateType + " was entered");
+  }
+}
+
+function clearInputDiv(){
+  while(calculatorInputDiv.firstChild !== null){
+    calculatorInputDiv.removeChild(calculatorInputDiv.lastChild);
+  }
+}
 
 /**
  * @type {'writing' | 'evaluated' | 'error'}
@@ -139,6 +181,16 @@ const updateExpression = {
 }
 
 // ---- Calculator Expression ----
+/**
+ * @param {'push' | 'update' | 'pop' | 'none'} updateType 
+ * @returns 
+ */
+function makeUpdateData(updateType){
+  return{
+    updateType: updateType
+  }
+}
+
 function makeNumberToken(n){
   return {
     type: 'value',
@@ -159,6 +211,7 @@ function makeOperationToken(operation){
 
 function pushNumberToExpression(n){
   calculatorExpression.push(makeNumberToken(n));
+  return makeUpdateData('push');
 }
 
 function pushAnsToExpression(){
@@ -169,7 +222,8 @@ function pushAnsToExpression(){
     getValue: function () {
       return calculatorHistory.previousResult;
     }
-  })
+  });
+  return makeUpdateData('push');
 }
 
 function pushOperationToExpression(operation){
@@ -177,16 +231,17 @@ function pushOperationToExpression(operation){
     calculatorStates[calculatorState].autoStartExpression();
   }
   calculatorExpression.push(makeOperationToken(operation));
+  return makeUpdateData('push');
 }
 
 function pushDigitToExpression(digit){
   const expressionEnd = arrayBack(calculatorExpression);
 
   if(expressionEnd === undefined || expressionEnd.type !== "value"){
-    pushNumberToExpression(digit);
-    return;
+    return pushNumberToExpression(digit);
   }
   expressionEnd.text += digit;
+  return makeUpdateData('update');
 }
 
 const numberTokenIsValid = (numToken) => {
@@ -235,24 +290,25 @@ function tokenToHTMLSpan(token){
 function numberDelete(numberToken){
   if(numberToken.text.length <= 1){
     calculatorExpression.pop();
-    return;
+    return makeUpdateData('pop');
   }
   numberToken.text = numberToken.text.slice(0, -1);
+  return makeUpdateData('update');
 }
 
 function deleteFromExpression(){
   const expressionEnd = arrayBack(calculatorExpression);
-  if(expressionEnd === undefined) return;
+  if(expressionEnd === undefined) return makeUpdateData('none');
   if(expressionEnd.type === 'value' && expressionEnd.valueType === 'number'){
-    numberDelete(expressionEnd);
-  } else {
-    calculatorExpression.pop();
+    return numberDelete(expressionEnd);
   }
+  calculatorExpression.pop();
+  return makeUpdateData('pop');
 }
 
 function clearInput(){
   calculatorExpression.length = 0;
-  updateCalculatorInput();
+  clearInputDiv();
 }
 
 function clearOutput(){
@@ -274,11 +330,11 @@ function buildInputFn(type, value){
     if((calculatorState !== "writing")
      && type !== 'backspace')
         clearInput();
-    updateExpression[type](value);
+    const updateType = updateExpression[type](value);
     if(calculatorState !== "writing")
       setCalculatorState('writing', type);
-    updateCalculatorInput();
     validateExpression();
+    updateInputDiv(updateType);
     pauseCusorAnimation();
   }
 }
@@ -417,16 +473,16 @@ function getLastOperationIndex(tokenizedExpression){
     }
     if(lastOperationIndex === undefined){
       lastOperationIndex = i;
-    } else if(currentToken.priority === 0) {
-      return i;
     } else {
       const lastOperation = tokenizedExpression[lastOperationIndex];
       if(currentToken.priority < lastOperation.priority){
         lastOperationIndex = i;
       }
     }
+    if(currentToken.priority === 0) {
+      return i;
+    } 
   }
-
   return lastOperationIndex;
 }
 
@@ -446,7 +502,7 @@ function getExpressionEvaluation(tokenizedExpression){
       }
     }
   }
-
+  
   if(evaluation === undefined){
     if(tokenizedExpression.length === 1){
       evaluation = arrayFront(tokenizedExpression).getValue();
@@ -468,9 +524,12 @@ function getExpressionEvaluation(tokenizedExpression){
     calculatorHistory.previousResult = evaluation;
     setCalculatorState('evaluated');
   } else {
+    if(evaluation === undefined){
+      evaluation = makeError('Syntax Error', 'trailing operation');
+    }
     setCalculatorState('error');
   }
-
+  
   return evaluation;
 }
 
