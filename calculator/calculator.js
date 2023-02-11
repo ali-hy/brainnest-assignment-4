@@ -2,13 +2,18 @@ const calculatorDisplayDiv = document.querySelector(".calculator-display");
 
 const calculatorInputDiv = document.querySelector(".calculator-input");
 const calculatorOutputDiv = document.querySelector(".calculator-output");
-var previousResult;
+
+const calculatorExpression = [];
+
 /**
  * @type {'writing' | 'evaluated' | 'error'}
  */
-var calculatorState = 'writing';
+var calculatorState;
 
-const calculatorHistory = [];
+
+const calculatorHistory = {
+  previousResult: 0,
+}
 
 // ---- Utility functions ----
 /**
@@ -36,7 +41,12 @@ function count(toBeFound, arr){
   if(typeof arr === 'string'){
     arr = arr.split('');
   }
-  return arr.reduce((count, value) => value === toBeFound ? count+1 : count);
+  var currentCount = 0;
+  for(let x of arr){
+    if(x === toBeFound)
+      currentCount++;
+  }
+  return currentCount;
 }
 /**
  * @param {Array} array 
@@ -52,18 +62,25 @@ function findLastIndex(array, callBackFn){
   }
   return i;
 }
+function round(value, decimalPlaces = 2){
+  if(typeof value === 'string'){
+    value = Number.parseFloat(value);
+  }
+  return Math.round(value * (10 ** decimalPlaces)) / (10 ** decimalPlaces);
+  
+}
 
 // ---- Dictionaries ----
 const operationInfo = {
   '-':{
     text: '−',
-    basicFunction: (a,b) => a + b,
-    priority: 1,
+    basicFunction: (a,b) => a - b,
+    priority: 0,
   },
   '/': {
     text: '÷',
     basicFunction: (a,b) => {
-      if(b === 0) return makeError('Math Error', 'Division by zero not allowed');
+      if(b === 0) return makeError('Math Error', 'Division by zero');
       return a / b;
     },
     priority: 1,
@@ -71,7 +88,7 @@ const operationInfo = {
   '*': {
     text: '×',
     basicFunction: (a,b) => a * b,
-    priority: 0,
+    priority: 1,
   },
   '+': {
     text: '+',
@@ -79,10 +96,49 @@ const operationInfo = {
     priority: 0,
   }
 }
+const calculatorStates = {
+  writing:{
+    autoStartExpression: buildInputFn('digit','0'),
+    setter: () => {
+      calculatorInputDiv.style.display = 'block';
+      calculatorState = "writing";
+      clearOutput();
+      calculatorInputDiv.classList.add('active');
+    }
+  },
+  evaluated:{
+    autoStartExpression: buildInputFn('ans'),
+    setter: () => {
+      calculatorState = "evaluated";
+      calculatorInputDiv.classList.remove('active');
+    }
+  },
+  error:{
+    autoStartExpression: buildInputFn('ans'),
+    setter: () => {
+      calculatorInputDiv.classList.remove('active');
+      calculatorInputDiv.style.display = 'none';
+      calculatorState = "error";
+    }
+  }
+}
+function setCalculatorState(state, payload){
+  calculatorStates[state].setter(payload);
+}
+setCalculatorState('writing');
+
+const updateExpression = {
+  digit: 
+    pushDigitToExpression,
+  operation: 
+    pushOperationToExpression,
+  backspace: 
+    deleteFromExpression,
+  ans:
+    pushAnsToExpression,
+}
 
 // ---- Calculator Expression ----
-const calculatorExpression = [];
-
 function makeNumberToken(n){
   return {
     type: 'value',
@@ -110,15 +166,15 @@ function pushAnsToExpression(){
     type: 'value',
     valueType: 'variable',
     text: 'Ans',
-    getValue: () => {
-      return previousResult;
+    getValue: function () {
+      return calculatorHistory.previousResult;
     }
   })
 }
 
 function pushOperationToExpression(operation){
   if(calculatorExpression.length === 0){
-    pushNumberToExpression('0');
+    calculatorStates[calculatorState].autoStartExpression();
   }
   calculatorExpression.push(makeOperationToken(operation));
 }
@@ -138,7 +194,9 @@ const numberTokenIsValid = (numToken) => {
 }
 
 function validateLastToken(lastToken, prev){
-
+  if(prev === undefined){
+    return lastToken.type === 'value';
+  }
 }
 
 function validateExpression(){
@@ -149,21 +207,28 @@ function validateExpression(){
       return;
     }
     if(currentToken.valueType === "number"){
-      if(numberTokenIsValid(currentToken))
-        (currentToken.syntaxError = "Numbers can't have more than one decimal point");
+      if(numberTokenIsValid(currentToken)){
+        currentToken.syntaxError = undefined;
+      } else {
+        currentToken.syntaxError = "Too many decimal points";
+      }
     }
     nextType = nextType === "value" ? "operation" : "value";
   }
 }
 
-function updateCalculatorDisplay(){
-  calculatorDisplayDiv.textContent = calculatorExpression.map(token => token.text).join(' ');
+function updateCalculatorInput(){
+  calculatorInputDiv.textContent = calculatorExpression.map(token => token.text).join(' ');
 }
 
 function tokenToHTMLSpan(token){
   const spanElement = document.createElement('span');
   spanElement.classList.add("token", token.type);
   spanElement.textContent = token.text;
+  if(token.syntaxError){
+    spanElement.classList.add("error");
+    spanElement.dataset.errorMessage = token.syntaxError;
+  }
   return spanElement;
 }
 
@@ -175,38 +240,46 @@ function numberDelete(numberToken){
   numberToken.text = numberToken.text.slice(0, -1);
 }
 
-function inputDel(){
+function deleteFromExpression(){
   const expressionEnd = arrayBack(calculatorExpression);
   if(expressionEnd === undefined) return;
-  if(expressionEnd.type === 'value' || expressionEnd.valueType === 'number'){
+  if(expressionEnd.type === 'value' && expressionEnd.valueType === 'number'){
     numberDelete(expressionEnd);
   } else {
     calculatorExpression.pop();
   }
-  updateCalculatorDisplay();
+}
+
+function clearInput(){
+  calculatorExpression.length = 0;
+  updateCalculatorInput();
+}
+
+function clearOutput(){
+  calculatorOutputDiv.textContent = '';
 }
 
 function clearDisplay(){
-  calculatorExpression.length = 0;
-  updateCalculatorDisplay();
+  clearInput();
+  clearOutput();
 }
 
-function digitInputFn(input){
-  return () => {
-    pushDigitToExpression(input);
-    updateCalculatorDisplay();
-  }
+function pauseCusorAnimation(){
+  calculatorInputDiv.classList.add("pause-animation");
+  setInterval(() => {calculatorInputDiv.classList.remove("pause-animation");}, 800);
 }
-function operationInputFn(operation){
+
+function buildInputFn(type, value){
   return () => {
-    pushOperationToExpression(operation);
-    updateCalculatorDisplay();
-  }
-}
-function ansInputFn(){
-  return () => {
-    pushAnsToExpression();
-    updateCalculatorDisplay();
+    if((calculatorState !== "writing")
+     && type !== 'backspace')
+        clearInput();
+    updateExpression[type](value);
+    if(calculatorState !== "writing")
+      setCalculatorState('writing', type);
+    updateCalculatorInput();
+    validateExpression();
+    pauseCusorAnimation();
   }
 }
 
@@ -214,7 +287,7 @@ function keyToButton(buttonParent){
   return (key) => {
     //auto-fill missing data
     if(key.callBackFn === undefined){
-      key.callBackFn = digitInputFn(key.text);
+      key.callBackFn = buildInputFn('digit',key.text);
     }
     if(key.keydownChecks === undefined){
       key.keydownChecks = new Set([key.text]);
@@ -271,14 +344,15 @@ const numberPadKeys = [{
   additionalClasses: ['bold']
 },{
   text: 'Ans',
-  keydownChecks: new Set(['a'])
+  keydownChecks: new Set(['a']),
+  callBackFn: buildInputFn('ans')
 }];
 const numberPadButtons = numberPadKeys.map(keyToButton(numPad));
 
 const operationPad = document.querySelector(".operation-pad");
 const operationPadKeys = [{
   text: 'DEL',
-  callBackFn: inputDel,
+  callBackFn: buildInputFn('backspace'),
   keydownChecks: new Set(['backspace','delete']),
   additionalClasses: ['deletion-btn']
 },{
@@ -289,21 +363,21 @@ const operationPadKeys = [{
 },{
   text: '+',
   idText: 'add',
-  callBackFn: operationInputFn('+'),
+  callBackFn: buildInputFn('operation','+'),
 },{
   text: '−',
   idText: 'sub',
-  callBackFn: operationInputFn('-'),
+  callBackFn: buildInputFn('operation','-'),
   keydownChecks: new Set('-')
 },{
   text: '÷',
   idText: 'div',
-  callBackFn: operationInputFn('/'),
+  callBackFn: buildInputFn('operation','/'),
   keydownChecks: new Set('/')
 },{
   text: '×',
   idText: 'mult',
-  callBackFn: operationInputFn('*'),
+  callBackFn: buildInputFn('operation','*'),
   keydownChecks: new Set('*')
 },{
   text: '=',
@@ -362,36 +436,46 @@ function getLastOperationIndex(tokenizedExpression){
  * @returns number (evaluaiton of expression) or CustomError
  */
 function getExpressionEvaluation(tokenizedExpression){
+  var evaluation;
   // If no argument is passed
   if(!tokenizedExpression){
     tokenizedExpression = calculatorExpression;
-    for(token of tokenizedExpression){
+    for(let token of tokenizedExpression){
       if(token.syntaxError){
-        return makeError('Syntax Error', token.syntaxError);
+        evaluation = makeError('Syntax Error', token.syntaxError);
       }
     }
   }
 
-  if(tokenizedExpression.length === 1){
-    return arrayFront(tokenizedExpression).getValue();
+  if(evaluation === undefined){
+    if(tokenizedExpression.length === 1){
+      evaluation = arrayFront(tokenizedExpression).getValue();
+    }else{
+      const lastOperationIndex = getLastOperationIndex(tokenizedExpression);
+      if(lastOperationIndex !== undefined){
+        const lastOperation = tokenizedExpression[lastOperationIndex];
+        evaluation = operate(
+          lastOperation, 
+          //tokens to the opeartion's left
+          tokenizedExpression.slice(0, lastOperationIndex), 
+          //tokens to the operation's right
+          tokenizedExpression.slice(lastOperationIndex + 1, tokenizedExpression.length)
+        );
+      }
+    }
+  }
+  if(typeof evaluation === "number"){
+    calculatorHistory.previousResult = evaluation;
+    setCalculatorState('evaluated');
+  } else {
+    setCalculatorState('error');
   }
 
-  const lastOperationIndex = getLastOperationIndex(tokenizedExpression);
-  if(lastOperationIndex !== undefined){
-    const lastOperation = tokenizedExpression[lastOperationIndex];
-    return operate(
-      lastOperation, 
-      //tokens to the opeartion's left
-      tokenizedExpression.slice(0, lastOperationIndex), 
-      //tokens to the operation's right
-      tokenizedExpression.slice(lastOperationIndex + 1, tokenizedExpression.length)
-    )
-  }
+  return evaluation;
 }
 
 function displayExpressionEvaluation(){
-  console.log(getExpressionEvaluation());
-  calculatorDisplayDiv.textContent = getExpressionEvaluation();
+  calculatorOutputDiv.textContent = getExpressionEvaluation();
 }
 
 function operate(operation, a, b){
@@ -410,3 +494,9 @@ function operate(operation, a, b){
     evaluationB
   )
 }
+
+window.addEventListener('keydown', (event) => {
+  if(event.key.toLowerCase() === 'arrowleft'){
+    setCalculatorState('writing');
+  }
+})

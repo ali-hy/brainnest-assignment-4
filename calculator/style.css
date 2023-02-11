@@ -30,16 +30,36 @@ body{
 
 .calculator-display{
   grid-area: display;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+
   color: white;
   min-height: 1em;
-  font-size: 20pt;
+  font-size: 14pt;
   font-family: 'Courier New', Courier, monospace;
   font-weight: 600;
-  padding: 0 40px;
-  display: flex;
-  align-items: center;
+  padding: 10px 40px;
   background-color: rgb(36, 36, 46);
   border-radius: var(--extra-round-radius);
+}
+
+.calculator-input.active::after{
+  content: '_';
+  display: inline;
+  animation-name: blink;
+  animation-duration: 1s;
+  animation-iteration-count: infinite;
+}
+
+.calculator-input.active.pause-animation::after{
+  animation: none;
+}
+
+.calculator-output{
+  text-align: right;
+  font-size: 18pt;
+  min-height: 1em;
 }
 
 .num-pad{
@@ -95,4 +115,25 @@ button.bottom-left{
 
 #key-decimal-point{
   font-size: 3em;
+}
+
+@keyframes blink {
+  0%{
+    opacity: 1;
+  }
+  24%{
+    opacity: 1;
+  }
+  25%{
+    opacity: 0;
+  }
+  75%{
+    opacity: 0;
+  }
+  76%{
+    opacity: 1
+  }
+  100%{
+    opacity: 1;
+  }
 }
