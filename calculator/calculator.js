@@ -1,10 +1,4 @@
 const calculatorDisplayDiv = document.querySelector(".calculator-display");
-<<<<<<< HEAD
-var calculatorDisplay = "";
-var previousResult;
-
-// ---- Utility functions ----
-=======
 
 const calculatorOutputDiv = document.querySelector(".calculator-output");
 
@@ -68,20 +62,16 @@ const calculatorHistory = {
  * @param {Array} arr 
  * @returns member at end of array 
  */
->>>>>>> display-upgrade
 function arrayBack(arr){
   if(arr.length > 0){
     return arr[arr.length - 1];
   }
   return undefined;
 }
-<<<<<<< HEAD
-=======
 /**
  * @param {Array} arr 
  * @returns first member of the array
  */
->>>>>>> display-upgrade
 function arrayFront(arr){
   return arr[0];
 }
@@ -93,9 +83,6 @@ function count(toBeFound, arr){
   if(typeof arr === 'string'){
     arr = arr.split('');
   }
-<<<<<<< HEAD
-  return arr.reduce((count, value) => value === toBeFound ? count+1 : count);
-=======
   var currentCount = 0;
   for(let x of arr){
     if(x === toBeFound)
@@ -123,33 +110,11 @@ function round(value, decimalPlaces = 2){
   }
   return Math.round(value * (10 ** decimalPlaces)) / (10 ** decimalPlaces);
   
->>>>>>> display-upgrade
 }
 
 // ---- Dictionaries ----
 const operationInfo = {
   '-':{
-<<<<<<< HEAD
-    display: '−',
-    basicFunction: (a,b) => a + b,
-  },
-  '/': {
-    display: '÷',
-    basicFunction: (a,b) => a / b,
-  },
-  '*': {
-    display: '×',
-    basicFunction: (a,b) => a * b,
-  },
-  '+': {
-    display: '+',
-    basicFunction: (a,b) => a + b,
-  }
-}
-
-// ---- Calculator Expression ----
-const calculatorExpression = [];
-=======
     text: '−',
     basicFunction: (a,b) => a - b,
     priority: 0,
@@ -225,18 +190,13 @@ function makeUpdateData(updateType){
     updateType: updateType
   }
 }
->>>>>>> display-upgrade
 
 function makeNumberToken(n){
   return {
     type: 'value',
     valueType: 'number',
     text: String(n),
-<<<<<<< HEAD
-    getValue: () => {
-=======
     getValue: function() {
->>>>>>> display-upgrade
       return Number.parseFloat(this.text);
     }
   }
@@ -245,36 +205,12 @@ function makeNumberToken(n){
 function makeOperationToken(operation){
   return{
     type: 'operation',
-<<<<<<< HEAD
-    text: operation,
-    displayCharacter: operationInfo[operation].display,
-    basicFunction: operationInfo[operation].basicFunction
-=======
     ... operationInfo[operation]
->>>>>>> display-upgrade
   }
 }
 
 function pushNumberToExpression(n){
   calculatorExpression.push(makeNumberToken(n));
-<<<<<<< HEAD
-  console.log(`added ${n} to calculatorExpression -> `, calculatorExpression);
-}
-
-function pushAnsToExpression(n){
-  return {
-    type: 'value',
-    valueType: 'variable',
-    text: String(n),
-    getValue: () => {
-      return previousResult;
-    }
-  }
-}
-
-function pushOperationToExpression(operation){
-  calculatorExpression.push(makeOperationToken(operation));
-=======
   return makeUpdateData('push');
 }
 
@@ -296,32 +232,12 @@ function pushOperationToExpression(operation){
   }
   calculatorExpression.push(makeOperationToken(operation));
   return makeUpdateData('push');
->>>>>>> display-upgrade
 }
 
 function pushDigitToExpression(digit){
   const expressionEnd = arrayBack(calculatorExpression);
 
   if(expressionEnd === undefined || expressionEnd.type !== "value"){
-<<<<<<< HEAD
-    pushNumberToExpression(digit);
-    return;
-  }
-  expressionEnd.text += digit;
-}
-
-const validateNumber = (numToken) => {
-  return count('.', numToken.text) <= 1;
-}
-
-function validateExpression(){
-  var nextType = "value";
-  for(const current of calculatorExpression){
-    if(current.type !== nextType){
-      current.syntaxError = `Expecteda a(n) ${nextType}`;
-      return;
-    }
-=======
     return pushNumberToExpression(digit);
   }
   expressionEnd.text += digit;
@@ -352,40 +268,10 @@ function validateExpression(){
         currentToken.syntaxError = "Too many decimal points";
       }
     }
->>>>>>> display-upgrade
     nextType = nextType === "value" ? "operation" : "value";
   }
 }
 
-<<<<<<< HEAD
-pushDigitToExpression('2');
-pushDigitToExpression('4')
-pushOperationToExpression('+');
-pushDigitToExpression('3');
-pushOperationToExpression('-');
-pushOperationToExpression('+');
-
-validateExpression();
-
-function updateCalculatorDisplay(){
-  calculatorDisplayDiv.textContent = calculatorDisplay;
-}
-
-function clearDisplay(){
-  calculatorDisplay = "";
-  updateCalculatorDisplay();
-}
-
-function inputDel(){
-  calculatorDisplay = calculatorDisplay.slice(0, -1);
-  updateCalculatorDisplay();
-}
-
-function inputFn(input){
-  return () => {
-    calculatorDisplay += input;
-    updateCalculatorDisplay();
-=======
 function updateCalculatorInput(){
   calculatorInputDiv.textContent = calculatorExpression.map(token => token.text).join(' ');
 }
@@ -453,20 +339,14 @@ function buildInputFn(type, value){
     validateExpression();
     updateInputDiv(updateType);
     pauseCusorAnimation();
->>>>>>> display-upgrade
   }
 }
 
 function keyToButton(buttonParent){
   return (key) => {
-<<<<<<< HEAD
-    if(key.callBackFn === undefined){
-      key.callBackFn = inputFn(key.text);
-=======
     //auto-fill missing data
     if(key.callBackFn === undefined){
       key.callBackFn = buildInputFn('digit',key.text);
->>>>>>> display-upgrade
     }
     if(key.keydownChecks === undefined){
       key.keydownChecks = new Set([key.text]);
@@ -475,28 +355,11 @@ function keyToButton(buttonParent){
       key.idText = key.text.toLowerCase();
     }
 
-<<<<<<< HEAD
-=======
     //create button
->>>>>>> display-upgrade
     const btn = document.createElement('button');
     btn.id = 'key-'+key.idText;
     btn.textContent = key.text;
     buttonParent.appendChild(btn);
-<<<<<<< HEAD
-  
-    btn.addEventListener('click', key.callBackFn);
-    if(key.additionalClasses) btn.classList.add(...key.additionalClasses);
-
-    window.addEventListener('keydown', (event) => {
-      // console.log(key.keydownChecks)
-      if(key.keydownChecks.has(event.key.toLowerCase())){
-        // console.log(event.key)
-        key.callBackFn();
-      } 
-    });
-    
-=======
     if(key.additionalClasses) btn.classList.add(...key.additionalClasses);
   
     //Add event listeners
@@ -507,7 +370,6 @@ function keyToButton(buttonParent){
       } 
     });
 
->>>>>>> display-upgrade
     return btn;
   }
 }
@@ -541,23 +403,15 @@ const numberPadKeys = [{
   additionalClasses: ['bold']
 },{
   text: 'Ans',
-<<<<<<< HEAD
-  keydownChecks: new Set(['a'])
-=======
   keydownChecks: new Set(['a']),
   callBackFn: buildInputFn('ans')
->>>>>>> display-upgrade
 }];
 const numberPadButtons = numberPadKeys.map(keyToButton(numPad));
 
 const operationPad = document.querySelector(".operation-pad");
 const operationPadKeys = [{
   text: 'DEL',
-<<<<<<< HEAD
-  callBackFn: inputDel,
-=======
   callBackFn: buildInputFn('backspace'),
->>>>>>> display-upgrade
   keydownChecks: new Set(['backspace','delete']),
   additionalClasses: ['deletion-btn']
 },{
@@ -568,25 +422,6 @@ const operationPadKeys = [{
 },{
   text: '+',
   idText: 'add',
-<<<<<<< HEAD
-  callBackFn: inputFn(' + '),
-},{
-  text: '−',
-  idText: 'sub',
-  callBackFn: inputFn(' - ')
-},{
-  text: '÷',
-  idText: 'div',
-  callBackFn: inputFn(' ÷ ')
-},{
-  text: '×',
-  idText: 'mult',
-  callBackFn: inputFn(' × ')
-},{
-  text: '=',
-  idText: 'eq',
-  callBackFn: operate,
-=======
   callBackFn: buildInputFn('operation','+'),
 },{
   text: '−',
@@ -607,17 +442,11 @@ const operationPadKeys = [{
   text: '=',
   idText: 'eq',
   callBackFn: displayExpressionEvaluation,
->>>>>>> display-upgrade
   keydownChecks: new Set(['enter', '=']),
   additionalClasses: ['bottom-right']
 }]
 const operationPadButtons = operationPadKeys.map(keyToButton(operationPad));
 
-<<<<<<< HEAD
-function operate(operation, a, b){
-
-}
-=======
 /**
  * @param {"Math Error" | "Syntax Error"} type 
  * @param {string} message 
@@ -733,4 +562,3 @@ window.addEventListener('keydown', (event) => {
     setCalculatorState('writing');
   }
 })
->>>>>>> display-upgrade
