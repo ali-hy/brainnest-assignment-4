@@ -1,21 +1,174 @@
+// ---- DOM constants ----
 const calculatorDisplayDiv = document.querySelector(".calculator-display");
-
 const calculatorOutputDiv = document.querySelector(".calculator-output");
-
-const calculatorExpression = [];
-
 const calculatorInputDiv = document.querySelector(".calculator-input");
+const numPad = document.querySelector(".num-pad");
+const operationPad = document.querySelector(".operation-pad");
+
+// ---- Global Variables ----
+const calculatorExpression = [];
+/**
+ * @type {'writing' | 'evaluated' | 'error'}
+ */
+var calculatorState;
+const calculatorHistory = {
+  previousResult: 0,
+}
+
+// ---- Dictionaries ----
+const operationInfo = function(operation){
+  switch(operation){
+    case '-': return{
+      text: '−',
+      basicFunction: (a,b) => a - b,
+      priority: 0,
+    }
+    case '/': return {
+      text: '÷',
+      basicFunction: (a,b) => {
+        if(b === 0) return makeError('Math Error', 'Division by zero');
+        return a / b;
+      },
+      priority: 1,
+    }
+    case '*': return {
+      text: '×',
+      basicFunction: (a,b) => a * b,
+      priority: 1,
+    }
+    case '+': return {
+      text: '+',
+      basicFunction: (a,b) => a + b,
+      priority: 0,
+    }
+    default: 
+      throw new Error(operation + " is not an operation");
+  }
+}
+
+const calculatorStates = function(state){
+  switch(state){
+    case 'writing': return{
+      autoStartExpression: buildInputFn('digit','0'),
+      setter: () => {
+        calculatorState = "writing";
+        showInputDiv();
+        clearOutput();
+        calculatorInputDiv.classList.add('active');
+      }
+    }
+    case 'evaluated': return{
+      autoStartExpression: buildInputFn('ans'),
+      setter: () => {
+        calculatorState = "evaluated";
+        calculatorInputDiv.classList.remove('active');
+      }
+    }
+    case 'error': return{
+      autoStartExpression: buildInputFn('ans'),
+      setter: () => {
+        calculatorState = "error";
+        calculatorInputDiv.classList.remove('active');
+        hideInputDiv();
+      }
+    }
+    default:
+      throw new Error(state + " is not a state");
+  }
+}
+
+/**
+ * @param {'digit' | 'operation' | 'backspace' | 'ans'} updateType 
+ * @param {any} payload 
+ * @returns data about the update that occured
+ */
+const updateExpression = function(updateType, payload){
+  switch(updateType){
+    case'digit': 
+      return pushDigitToExpression(payload);
+    case'operation': 
+      return pushOperationToExpression(payload);
+    case'backspace': 
+      return deleteFromExpression();
+    case'ans':
+      return pushAnsToExpression();
+    default:
+      throw new Error(updateType + " is not an update type");
+  }
+}
+
+// ---- Utility functions ----
+/**
+ * @param {Array} arr 
+ * @returns member at end of array 
+ */
+function arrayBack(arr){
+  if(arr.length > 0){
+    return arr[arr.length - 1];
+  }
+  return undefined;
+}
+
+/**
+ * @param {Array} arr 
+ * @returns first member of the array
+ */
+function arrayFront(arr){
+  return arr[0];
+}
+
+/**
+ * @param {string | Array} arr 
+ * @param {any} memberToCount 
+ */
+function count(memberToCount, arr){
+  if(typeof arr === 'string'){
+    arr = arr.split('');
+  }
+  var currentCount = 0;
+  for(let x of arr){
+    if(x === memberToCount)
+      currentCount++;
+  }
+  return currentCount;
+}
+
+/**
+ * @param {Array} array 
+ * @param {(element, index:number, array:Array) => boolean} callBackFn 
+ */
+function findLastIndex(array, callBackFn){
+  let i;
+  for(i = array.length - 1; i >= 0; i++){
+    const currentElement =  array[i];
+    if(callBackFn(currentElement, i, array)){
+      break;
+    }
+  }
+  return i;
+}
+
+function round(value, decimalPlaces = 2){
+  if(typeof value === 'string'){
+    value = Number.parseFloat(value);
+  }
+  return Math.round(value * (10 ** decimalPlaces)) / (10 ** decimalPlaces);
+}
+
+// ---- Manipulate Display ----
 function pushTokenToInputDiv(){
   calculatorInputDiv.appendChild(
     tokenToHTMLSpan(arrayBack(calculatorExpression))
   );
 }
+
 function updateLastTokenInInputDiv(){
   calculatorInputDiv.replaceChild(
     tokenToHTMLSpan(arrayBack(calculatorExpression)),
     calculatorInputDiv.lastElementChild
   );
 }
+
 function popTokenFromInputDiv(){
   calculatorInputDiv.removeChild(calculatorInputDiv.lastChild);
 }
@@ -32,7 +185,6 @@ function updateInputDiv({updateType}){
       popTokenFromInputDiv();
       break;
     case 'none':
-      console.log("no update occured");
       break;
     default:
       throw new Error("update type for updateInputDiv(updateType) can only be "
@@ -47,140 +199,35 @@ function clearInputDiv(){
   }
 }
 
-/**
- * @type {'writing' | 'evaluated' | 'error'}
- */
-var calculatorState;
-
-
-const calculatorHistory = {
-  previousResult: 0,
+function hideInputDiv(){
+  calculatorInputDiv.style.display = 'none';
 }
 
-// ---- Utility functions ----
-/**
- * @param {Array} arr 
- * @returns member at end of array 
- */
-function arrayBack(arr){
-  if(arr.length > 0){
-    return arr[arr.length - 1];
-  }
-  return undefined;
-}
-/**
- * @param {Array} arr 
- * @returns first member of the array
- */
-function arrayFront(arr){
-  return arr[0];
-}
-/**
- * @param {string | Array} arr 
- * @param {any} toBeFound 
- */
-function count(toBeFound, arr){
-  if(typeof arr === 'string'){
-    arr = arr.split('');
-  }
-  var currentCount = 0;
-  for(let x of arr){
-    if(x === toBeFound)
-      currentCount++;
-  }
-  return currentCount;
-}
-/**
- * @param {Array} array 
- * @param {(element, index:number, array:Array) => boolean} callBackFn 
- */
-function findLastIndex(array, callBackFn){
-  let i;
-  for(i = array.length - 1; i >= 0; i++){
-    const currentElement =  array[i];
-    if(callBackFn(currentElement, i, array)){
-      break;
-    }
-  }
-  return i;
-}
-function round(value, decimalPlaces = 2){
-  if(typeof value === 'string'){
-    value = Number.parseFloat(value);
-  }
-  return Math.round(value * (10 ** decimalPlaces)) / (10 ** decimalPlaces);
-  
+function showInputDiv(){
+  calculatorInputDiv.style.display = 'block';
 }
 
-// ---- Dictionaries ----
-const operationInfo = {
-  '-':{
-    text: '−',
-    basicFunction: (a,b) => a - b,
-    priority: 0,
-  },
-  '/': {
-    text: '÷',
-    basicFunction: (a,b) => {
-      if(b === 0) return makeError('Math Error', 'Division by zero');
-      return a / b;
-    },
-    priority: 1,
-  },
-  '*': {
-    text: '×',
-    basicFunction: (a,b) => a * b,
-    priority: 1,
-  },
-  '+': {
-    text: '+',
-    basicFunction: (a,b) => a + b,
-    priority: 0,
-  }
+function clearInput(){
+  calculatorExpression.length = 0;
+  clearInputDiv();
 }
-const calculatorStates = {
-  writing:{
-    autoStartExpression: buildInputFn('digit','0'),
-    setter: () => {
-      calculatorInputDiv.style.display = 'block';
-      calculatorState = "writing";
-      clearOutput();
-      calculatorInputDiv.classList.add('active');
-    }
-  },
-  evaluated:{
-    autoStartExpression: buildInputFn('ans'),
-    setter: () => {
-      calculatorState = "evaluated";
-      calculatorInputDiv.classList.remove('active');
-    }
-  },
-  error:{
-    autoStartExpression: buildInputFn('ans'),
-    setter: () => {
-      calculatorInputDiv.classList.remove('active');
-      calculatorInputDiv.style.display = 'none';
-      calculatorState = "error";
-    }
-  }
+
+function clearOutput(){
+  calculatorOutputDiv.textContent = '';
 }
+
+function clearDisplay(){
+  clearInput();
+  clearOutput();
+}
+
+// ---- Set Calculator State ----
 function setCalculatorState(state, payload){
-  calculatorStates[state].setter(payload);
+  calculatorStates(state).setter(payload);
 }
 setCalculatorState('writing');
 
-const updateExpression = {
-  digit: 
-    pushDigitToExpression,
-  operation: 
-    pushOperationToExpression,
-  backspace: 
-    deleteFromExpression,
-  ans:
-    pushAnsToExpression,
-}
-
-// ---- Calculator Expression ----
+// ---- Object "Constructors" ----
 /**
  * @param {'push' | 'update' | 'pop' | 'none'} updateType 
  * @returns 
@@ -205,77 +252,26 @@ function makeNumberToken(n){
 function makeOperationToken(operation){
   return{
     type: 'operation',
-    ... operationInfo[operation]
+    ... operationInfo(operation)
   }
 }
 
-function pushNumberToExpression(n){
-  calculatorExpression.push(makeNumberToken(n));
-  return makeUpdateData('push');
-}
-
-function pushAnsToExpression(){
-  calculatorExpression.push({
-    type: 'value',
-    valueType: 'variable',
-    text: 'Ans',
-    getValue: function () {
-      return calculatorHistory.previousResult;
+/**
+ * @param {"Math Error" | "Syntax Error"} type 
+ * @param {string} message 
+ * @returns returns an error object 
+ */
+function makeError(type, message){
+  return{
+    type: type,
+    message: message,
+    toString: function(){
+      return `${this.type}: ${this.message}`;
     }
-  });
-  return makeUpdateData('push');
-}
-
-function pushOperationToExpression(operation){
-  if(calculatorExpression.length === 0){
-    calculatorStates[calculatorState].autoStartExpression();
-  }
-  calculatorExpression.push(makeOperationToken(operation));
-  return makeUpdateData('push');
-}
-
-function pushDigitToExpression(digit){
-  const expressionEnd = arrayBack(calculatorExpression);
-
-  if(expressionEnd === undefined || expressionEnd.type !== "value"){
-    return pushNumberToExpression(digit);
-  }
-  expressionEnd.text += digit;
-  return makeUpdateData('update');
-}
-
-const numberTokenIsValid = (numToken) => {
-  return count('.', numToken.text) <= 1;
-}
-
-function validateLastToken(lastToken, prev){
-  if(prev === undefined){
-    return lastToken.type === 'value';
   }
 }
 
-function validateExpression(){
-  var nextType = "value";
-  for(const currentToken of calculatorExpression){
-    if(currentToken.type !== nextType){
-      currentToken.syntaxError = `Expected a(n) ${nextType}`;
-      return;
-    }
-    if(currentToken.valueType === "number"){
-      if(numberTokenIsValid(currentToken)){
-        currentToken.syntaxError = undefined;
-      } else {
-        currentToken.syntaxError = "Too many decimal points";
-      }
-    }
-    nextType = nextType === "value" ? "operation" : "value";
-  }
-}
-
-function updateCalculatorInput(){
-  calculatorInputDiv.textContent = calculatorExpression.map(token => token.text).join(' ');
-}
-
+// ---- Mapping Functions ----
 function tokenToHTMLSpan(token){
   const spanElement = document.createElement('span');
   spanElement.classList.add("token", token.type);
@@ -288,58 +284,6 @@ function tokenToHTMLSpan(token){
     spanElement.dataset.errorMessage = token.syntaxError;
   }
   return spanElement;
-}
-
-function numberDelete(numberToken){
-  if(numberToken.text.length <= 1){
-    calculatorExpression.pop();
-    return makeUpdateData('pop');
-  }
-  numberToken.text = numberToken.text.slice(0, -1);
-  return makeUpdateData('update');
-}
-
-function deleteFromExpression(){
-  const expressionEnd = arrayBack(calculatorExpression);
-  if(expressionEnd === undefined) return makeUpdateData('none');
-  if(expressionEnd.type === 'value' && expressionEnd.valueType === 'number'){
-    return numberDelete(expressionEnd);
-  }
-  calculatorExpression.pop();
-  return makeUpdateData('pop');
-}
-
-function clearInput(){
-  calculatorExpression.length = 0;
-  clearInputDiv();
-}
-
-function clearOutput(){
-  calculatorOutputDiv.textContent = '';
-}
-
-function clearDisplay(){
-  clearInput();
-  clearOutput();
-}
-
-function pauseCusorAnimation(){
-  calculatorInputDiv.classList.add("pause-animation");
-  setInterval(() => {calculatorInputDiv.classList.remove("pause-animation");}, 800);
-}
-
-function buildInputFn(type, value){
-  return () => {
-    if((calculatorState !== "writing")
-     && type !== 'backspace')
-        clearInput();
-    const updateType = updateExpression[type](value);
-    if(calculatorState !== "writing")
-      setCalculatorState('writing', type);
-    validateExpression();
-    updateInputDiv(updateType);
-    pauseCusorAnimation();
-  }
 }
 
 function keyToButton(buttonParent){
@@ -374,7 +318,107 @@ function keyToButton(buttonParent){
   }
 }
 
-const numPad = document.querySelector(".num-pad");
+// ---- Manipulate Expression ----
+function pushNumberToExpression(n){
+  calculatorExpression.push(makeNumberToken(n));
+  return makeUpdateData('push');
+}
+
+function pushAnsToExpression(){
+  calculatorExpression.push({
+    type: 'value',
+    valueType: 'variable',
+    text: 'Ans',
+    getValue: function () {
+      return calculatorHistory.previousResult;
+    }
+  });
+  return makeUpdateData('push');
+}
+
+function autoStartExpression(){
+  calculatorStates(calculatorState).autoStartExpression();
+}
+
+function pushOperationToExpression(operation){
+  const lastToken = arrayBack(calculatorExpression);
+  if(lastToken.type === "operation"){
+    updateInputDiv(updateExpression('backspace'))
+  }
+  if(calculatorExpression.length === 0){
+    autoStartExpression();
+  }
+  calculatorExpression.push(makeOperationToken(operation));
+  return makeUpdateData('push');
+}
+
+function pushDigitToExpression(digit){
+  const expressionEnd = arrayBack(calculatorExpression);
+
+  if(expressionEnd === undefined || expressionEnd.type !== "value"){
+    return pushNumberToExpression(digit);
+  }
+  expressionEnd.text += digit;
+  return makeUpdateData('update');
+}
+
+const numberTokenIsValid = (numToken) => {
+  return count('.', numToken.text) <= 1;
+}
+
+function numberDelete(numberToken){
+  if(numberToken.text.length <= 1){
+    calculatorExpression.pop();
+    return makeUpdateData('pop');
+  }
+  numberToken.text = numberToken.text.slice(0, -1);
+  return makeUpdateData('update');
+}
+
+function deleteFromExpression(){
+  if(calculatorExpression.length === 0) 
+    return makeUpdateData('none');
+  
+  const expressionEnd = arrayBack(calculatorExpression);
+  if(expressionEnd.type === 'value' && expressionEnd.valueType === 'number'){
+    return numberDelete(expressionEnd);
+  }
+
+  calculatorExpression.pop();
+  return makeUpdateData('pop');
+}
+
+function validateExpression(){
+  for(const currentToken of calculatorExpression){
+    if(currentToken.valueType === "number"){
+      if(numberTokenIsValid(currentToken)){
+        currentToken.syntaxError = undefined;
+      } else {
+        currentToken.syntaxError = "Too many decimal points";
+      }
+    }
+  }
+}
+
+function pauseCusorAnimation(){
+  calculatorInputDiv.classList.add("pause-animation");
+  setInterval(() => {calculatorInputDiv.classList.remove("pause-animation");}, 800);
+}
+
+function buildInputFn(inputType, value){
+  return () => {
+    if((calculatorState !== "writing")
+     && inputType !== 'backspace')
+        clearInput();
+    const updateData = updateExpression(inputType, value);
+    if(calculatorState !== "writing")
+      setCalculatorState('writing', inputType);
+    validateExpression();
+    updateInputDiv(updateData);
+    pauseCusorAnimation();
+  }
+}
+
 const numberPadKeys = [{
   text: '7',
   additionalClasses: ['top-left']
@@ -408,7 +452,6 @@ const numberPadKeys = [{
 }];
 const numberPadButtons = numberPadKeys.map(keyToButton(numPad));
 
-const operationPad = document.querySelector(".operation-pad");
 const operationPadKeys = [{
   text: 'DEL',
   callBackFn: buildInputFn('backspace'),
@@ -447,21 +490,8 @@ const operationPadKeys = [{
 }]
 const operationPadButtons = operationPadKeys.map(keyToButton(operationPad));
 
-/**
- * @param {"Math Error" | "Syntax Error"} type 
- * @param {string} message 
- * @returns returns an error object 
- */
-function makeError(type, message){
-  return{
-    type: type,
-    message: message,
-    toString: function(){
-      return `${this.type}: ${this.message}`;
-    }
-  }
-}
 
+// ---- Evaluation ----
 /**
  * @param {undefined | Array} tokenizedExpression 
  * @returns operation to be executed last
@@ -470,7 +500,6 @@ function getLastOperationIndex(tokenizedExpression){
   let i, lastOperationIndex;
   for(i = tokenizedExpression.length - 1; i >= 0; i--){
     const currentToken = tokenizedExpression[i];
-    // console.log('i: '+i);
     if(currentToken.type !== 'operation'){
       continue;
     }
@@ -488,7 +517,6 @@ function getLastOperationIndex(tokenizedExpression){
   }
   return lastOperationIndex;
 }
-
 
 /**
  * @param {undefined | Array} tokenizedExpression 
