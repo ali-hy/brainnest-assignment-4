@@ -148,7 +148,7 @@ function findLastIndex(array, callBackFn){
   return i;
 }
 
-function round(value, decimalPlaces = 2){
+function round(value, decimalPlaces = 4){
   if(typeof value === 'string'){
     value = Number.parseFloat(value);
   }
@@ -341,12 +341,12 @@ function autoStartExpression(){
 }
 
 function pushOperationToExpression(operation){
+  if(calculatorExpression.length === 0){
+    autoStartExpression();
+  }
   const lastToken = arrayBack(calculatorExpression);
   if(lastToken.type === "operation"){
     updateInputDiv(updateExpression('backspace'))
-  }
-  if(calculatorExpression.length === 0){
-    autoStartExpression();
   }
   calculatorExpression.push(makeOperationToken(operation));
   return makeUpdateData('push');
